@@ -192,6 +192,17 @@ Các mục bonus (§5, §7–§9) chỉ cần điền nếu bạn làm phần t�
 3. Nếu chạy trên máy riêng, chạy `make verify` để tự kiểm tra; lệnh phải kết thúc không lỗi.
 4. Nộp đường dẫn repo vào LMS. Giữ repo public đến khi có điểm.
 
+Trên Windows không có `make`, dùng `python -X utf8 scripts/verify.py`. Nếu tải kết quả từ Colab về
+máy và giữ đường dẫn huấn luyện gốc trong adapter config, khai báo thư mục repo ban đầu:
+
+```powershell
+python -X utf8 scripts/verify.py --training-root /content/lab22
+```
+
+Tuỳ chọn này ánh xạ đúng đường dẫn `models/sft-merged` dưới thư mục gốc đã khai báo; các kiểm tra
+hash split, kết quả chấm và bài phản tư vẫn được giữ. Script không sửa cấu hình adapter và không
+chạy lại huấn luyện. Khi không truyền tuỳ chọn, script vẫn yêu cầu reference thuộc repo hiện tại.
+
 Lưu ý: bài được chấm từ repo nên **chỉ file đã commit mới được tính**. File `.gitignore` đã chặn trọng số mô
 hình; tuyệt đối không commit file `.env` hay khoá API.
 

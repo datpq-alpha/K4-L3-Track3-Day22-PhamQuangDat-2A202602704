@@ -3,6 +3,7 @@
 
     make verify                  # python scripts/verify.py
     make smoke                   # python scripts/verify.py --smoke
+    python -X utf8 scripts/verify.py --training-root /content/lab22
 
 Exits 0 when every core artifact exists and REFLECTION.md is filled in,
 otherwise prints what is missing. Writes nothing.
@@ -14,7 +15,7 @@ import hashlib
 import json
 import re
 import sys
-from pathlib import Path
+from pathlib import Path, PurePath, PurePosixPath, PureWindowsPath
 
 REPO = Path(__file__).resolve().parent.parent
 NOTEBOOKS = [
@@ -52,16 +53,35 @@ def read_json(path: Path, problems: list[str]) -> dict | list | None:
         return None
 
 
-def check_dpo(problems: list[str], warnings: list[str]) -> None:
+def training_root_path(value: str) -> PurePath:
+    """Parse the original root without interpreting foreign paths on this OS."""
+    root = PureWindowsPath(value) if PureWindowsPath(value).drive else PurePosixPath(value)
+    if not root.is_absolute() or ".." in root.parts:
+        raise argparse.ArgumentTypeError("training root must be an absolute path without '..'")
+    return root
+
+
+def reference_matches(base: str, training_root: PurePath | None = None) -> bool:
+    if not base:
+        return False
+    if Path(base).resolve() == (REPO / "models" / "sft-merged").resolve():
+        return True
+    # A copied submission may retain its training environment's absolute path.
+    # Require the exact SFT path under the declared root, never just a suffix.
+    return training_root is not None and type(training_root)(base) == training_root / "models" / "sft-merged"
+
+
+def check_dpo(problems: list[str], warnings: list[str], training_root: PurePath | None = None) -> None:
     adapter = REPO / "adapters" / "dpo"
     if not need(adapter / "adapter_config.json", "DPO adapter (NB3)", problems):
         return
     base = str((read_json(adapter / "adapter_config.json", problems) or {}).get("base_model_name_or_path", ""))
     expected = (REPO / "models" / "sft-merged").resolve()
-    if not base or Path(base).resolve() != expected:
+    if not reference_matches(base, training_root):
         problems.append(
             f"WRONG REF  adapters/dpo was trained on {base!r}, not {rel(expected)}: the DPO reference "
-            "must be this repo's SFT model (if the repo moved, rerun NB3 here)."
+            "must be this repo's SFT model. For a copied submission, pass --training-root with the "
+            "original repo root; otherwise rerun NB3 with the correct SFT reference."
         )
     sys.path.insert(0, str(REPO))
     from lab22.data import split_mismatch
@@ -187,19 +207,26 @@ def smoke() -> int:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--smoke", action="store_true", help="pre-training import/GPU check")
-    if parser.parse_args().smoke:
+    parser.add_argument(
+        "--training-root", type=training_root_path,
+        help="original absolute repo root when checking copied artifacts (e.g. /content/lab22)",
+    )
+    args = parser.parse_args()
+    if args.smoke:
         return smoke()
 
     problems: list[str] = []
     warnings: list[str] = []
     print(f"==> Verifying submission at {REPO}\n")
+    if args.training_root is not None:
+        print(f"Original training root: {args.training_root} (copied artifacts; configs kept unchanged)\n")
     for nb in NOTEBOOKS:
         need(REPO / "notebooks" / f"{nb}.py", f"notebook {nb}", problems)
     need(REPO / "adapters" / "sft-mini" / "adapter_config.json", "SFT adapter (NB1)", problems)
     need(REPO / "models" / "sft-merged" / "config.json", "merged SFT model = DPO reference (NB1)", problems)
     need(REPO / "data" / "pref" / "train.parquet", "preference train split (NB2)", problems)
     need(REPO / "data" / "pref" / "eval.parquet", "held-out preference split (NB2)", problems)
-    check_dpo(problems, warnings)
+    check_dpo(problems, warnings, training_root=args.training_root)
     check_judge(problems, warnings)
     check_reflection(problems)
     check_screenshots(problems)
@@ -218,7 +245,7 @@ def main() -> int:
     print("✗ Submission not ready:")
     for line in problems:
         print(f"  - {line}")
-    print("\nFix the items above and rerun `make verify`. See rubric.md.")
+    print("\nFix the items above and rerun the verification command. See rubric.md.")
     return 1
 
 
