@@ -206,6 +206,9 @@ chạy lại huấn luyện. Khi không truyền tuỳ chọn, script vẫn yêu
 Lưu ý: bài được chấm từ repo nên **chỉ file đã commit mới được tính**. File `.gitignore` đã chặn trọng số mô
 hình; tuyệt đối không commit file `.env` hay khoá API.
 
+Bonus chấm chéo API có thể chạy trên máy local từ câu trả lời NB4 đã lưu, không cần GPU
+hoặc huấn luyện lại. Xem [hướng dẫn chấm bằng GPT-4o mini](docs/API-JUDGE.md).
+
 **Hạn nộp:** 23:59 ngày hôm sau. Nộp muộn trừ 10% mỗi ngày, quá 3 ngày được 0 điểm. Phúc khảo trong vòng 1 tuần.
 
 ---

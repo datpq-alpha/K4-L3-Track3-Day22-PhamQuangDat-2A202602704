@@ -30,8 +30,9 @@ Báo cáo đối chiếu yêu cầu trong [README.md](../README.md) và [rubric.
 | Môi trường trong log | Unsloth 2026.10.2; Transformers 5.17.0; PyTorch 2.11.0+cu130 |
 | Đánh giá sinh câu trả lời | Greedy; 4 câu helpfulness + 4 câu safety + 50 câu held-out |
 | Giám khảo cấu hình ban đầu | `Skywork/Skywork-Reward-V2-Qwen3-4B` và `Skywork/Skywork-Reward-V2-Llama-3.2-3B` |
-| Giám khảo kết luận cuối | Chỉ Llama: sanity 12/12; Qwen3 đạt 8/12, dưới ngưỡng 80%, nên bị loại |
-| Chi phí | Không dùng API trả phí; chưa ghi nhận số tiền thực tế của phiên Colab |
+| Giám khảo RM sau lọc | Chỉ Llama: sanity 12/12; Qwen3 đạt 8/12, dưới ngưỡng 80%, nên bị loại |
+| Giám khảo API bổ sung | `openai:gpt-4o-mini`; chấm lại cùng 58 cặp đã lưu, mỗi cặp theo hai thứ tự A/B |
+| Chi phí | Đã dùng OpenAI API cho bonus chấm chéo; chưa lưu usage token/số tiền thực tế của API và phiên Colab |
 
 Loss SFT ở bước 10 là 1,884187 và bước 120 là 1,283428; có dao động nhưng xu hướng chung giảm. Loss trung bình toàn lượt là 1,3602. Output xác nhận đã lưu adapter SFT và mô hình SFT gộp; DPO không lấy trực tiếp mô hình gốc làm reference.
 
@@ -92,7 +93,7 @@ Hàm `diagnose` trong `lab22/modeling.py` trả `INTENDED` khi reward chosen tru
 
 Các bảng kết quả chính lấy từ [judge_summary.json](../data/eval/judge_summary.json). Những phép tính bổ sung dưới đây dùng [kết quả chấm từng cặp](../data/eval/judge_results_rm.json), được thực hiện sau lần chạy để làm rõ cách diễn giải, không phải thí nghiệm huấn luyện mới. Có thể tính lại bằng `python -X utf8 scripts/analyze_eval_diagnostics.py` từ thư mục repo; [script phân tích](../scripts/analyze_eval_diagnostics.py) cần SciPy, chỉ đọc file đã lưu và không gọi mô hình hoặc API.
 
-### 4.1. Kết quả chính và ý nghĩa của win rate
+### 4.1. Kết quả RM và ý nghĩa của win rate
 
 Theo quy ước của lab, **win rate = (DPO thắng + 0,5 × hoà) / n**. Đây là điểm thắng trung bình có tính nửa điểm cho hoà (*tie-adjusted win rate*). Win rate 46% không có nghĩa DPO thắng trực tiếp 23/50 câu; số thắng trực tiếp là 6/50.
 
@@ -116,7 +117,7 @@ Không có lượt chấm lỗi (`n_failed=0`). “Cặp dài gần bằng nhau�
 | Tỉ lệ thay đổi đầu ra | 16/50 | 32% |
 | DPO thắng trong các cặp không hoà | 6/(6 + 10) | 37,50% |
 
-Trong dữ liệu này, cả 34 lượt hoà held-out đều có hai chuỗi trả lời giống hệt nhau; cả 16 cặp khác nhau đều có bên thắng. Vì vậy “cặp không hoà” và “cặp thay đổi đầu ra” trùng nhau ở lần chạy này, nhưng không phải quy luật chung cho mọi giám khảo hoặc thí nghiệm. Tỉ lệ 37,50% chỉ mô tả nhóm 16 cặp đó, không thay thế win rate chính thức 46% và không được suy rộng như kết quả của một mẫu ngẫu nhiên độc lập mới.
+Theo giám khảo Llama RM, cả 34 lượt hoà held-out đều có hai chuỗi trả lời giống hệt nhau; cả 16 cặp khác nhau đều có bên thắng. Vì vậy “cặp không hoà” và “cặp thay đổi đầu ra” trùng nhau ở kết quả RM này, nhưng không phải quy luật chung cho mọi giám khảo hoặc thí nghiệm; kết quả API ở §4.8 có thêm các cặp khác đầu ra được chấm hoà. Tỉ lệ 37,50% chỉ mô tả nhóm 16 cặp đó theo Llama, không thay thế win rate RM 46% và không được suy rộng như kết quả của một mẫu ngẫu nhiên độc lập mới.
 
 Margin ở NB3 tăng nhưng 68% đầu ra held-out giữ nguyên không phải mâu thuẫn: xác suất token có thể thay đổi mà token đứng đầu ở mỗi bước greedy vẫn giữ nguyên. Do đó, câu trả lời giống nhau không chứng minh DPO không học. Tuy nhiên, ở những câu đã thay đổi, giám khảo Llama ưu tiên SFT nhiều hơn trong mẫu quan sát. Tôi kiểm tra bổ sung bằng kiểm định nhị thức chính xác hai phía trên 16 cặp không hoà, với giả thuyết xác suất DPO thắng là 0,5: `binomtest(6, 16, p=0.5)` cho **p ≈ 0,4545**. Với giả định các cặp độc lập và giám khảo cố định, kết quả này chưa đủ để kết luận DPO tốt hơn hoặc kém hơn SFT ở mức 5%; p lớn không chứng minh hai mô hình tương đương. Đây là phân tích bổ sung có điều kiện, không phải phép kiểm định được đăng ký trước. Phương pháp được mô tả trong [tài liệu SciPy về binomtest](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.binomtest.html).
 
@@ -172,7 +173,7 @@ Hai giám khảo cùng chọn DPO ở 3 cặp, cùng chọn SFT ở 3 cặp và 
 
 Win rate Qwen3 là 54%, Llama là 46%, chênh **8 điểm phần trăm**, không phải bất đồng trên 8% số câu. Không thể kết luận ý nghĩa thống kê chỉ bằng việc nhìn hai CI riêng chồng lấn. Tôi kiểm tra bổ sung đúng cấu trúc ghép cặp: với mỗi câu hỏi, lấy điểm quy ước của Qwen3 trừ điểm của Llama, rồi bootstrap 2.000 lần trên 50 chênh lệch, seed 42. Chênh lệch trung bình là 0,08, CI 95% **[−0,04; 0,20]**, tức **[−4; 20] điểm phần trăm**. Khoảng chứa 0 nên chưa xác lập chênh lệch win rate có ý nghĩa theo phép ước lượng này. Qwen3 đã bị loại, nên phân tích chỉ là chẩn đoán độ nhạy, không khôi phục nó vào kết luận cuối.
 
-Theo bối cảnh README/rubric, cả RM gán nhãn dữ liệu và hai RM đánh giá đều thuộc Skywork; Qwen3 còn cùng họ Qwen với policy và Sailor2, còn Llama khác mô hình nền nhưng vẫn cùng nhóm phát triển Skywork. Đây là lý do cần kiểm tra nguy cơ thiên vị liên quan nguồn gốc mô hình. Dữ liệu hiện tại chứng minh có bất đồng giữa giám khảo; chưa xác định đó là thiên vị họ mô hình, preference leakage hay khác biệt tiêu chí chấm. Tôi chưa có đối chứng API khác họ hoặc nhãn người độc lập để quy nguyên nhân.
+Theo bối cảnh README/rubric, cả RM gán nhãn dữ liệu và hai RM đánh giá đều thuộc Skywork; Qwen3 còn cùng họ Qwen với policy và Sailor2, còn Llama khác mô hình nền nhưng vẫn cùng nhóm phát triển Skywork. Đây là lý do cần kiểm tra nguy cơ thiên vị liên quan nguồn gốc mô hình. Dữ liệu hiện tại chứng minh có bất đồng giữa giám khảo; chưa xác định đó là thiên vị họ mô hình, preference leakage hay khác biệt tiêu chí chấm. Tôi đã bổ sung API GPT-4o mini khác nhà phát triển ở §4.8, nhưng vẫn chưa có nhãn người độc lập hoặc thí nghiệm kiểm soát để quy nguyên nhân.
 
 ### 4.5. Độ dài có đang chi phối kết quả không?
 
@@ -217,7 +218,39 @@ Một khác biệt đáng chú ý là template đã lưu chèn đoạn `<think>\
 
 Phiên Colab đã ngắt nên tôi chưa thực hiện phép thử suy luận đối chứng giữa model gốc và model bật adapter SFT. Nếu có điều kiện chạy lại, tôi sẽ dùng cùng tokenizer, prompt và cấu hình greedy để so sánh khi tắt/bật adapter; sau đó đối chiếu thêm bản SFT merged. Nếu thẻ chỉ xuất hiện khi bật adapter thì ưu tiên kiểm tra dữ liệu đã format và phần token tính loss của SFT; nếu cả hai đều lỗi thì kiểm tra model gốc/template/tokenizer; nếu chỉ bản merged lỗi thì kiểm tra merge/load. Hiện kết luận chỉ ở mức khoanh vùng, chưa xác nhận nguyên nhân gốc.
 
-Từ NB4, tôi chưa có bằng chứng đủ mạnh rằng DPO cải thiện chất lượng sinh câu trả lời so với SFT ở cấu hình này. Lần đánh giá tiếp theo cần ưu tiên xác minh lỗi định dạng, bổ sung chấm của người theo tiêu chí đúng/nhất quán/tuân thủ yêu cầu, và kiểm tra bằng giám khảo độc lập hơn. Tôi sẽ giữ kết quả trên toàn bộ tập đã định trước, đồng thời báo riêng nhóm có thay đổi; không chỉ chọn các câu DPO thắng hoặc đổi giám khảo sau khi thấy kết quả để làm đẹp win rate.
+### 4.8. Bonus chấm chéo bằng GPT-4o mini
+
+Sau khi hoàn thành phần lõi, tôi dùng `openai:gpt-4o-mini` chấm lại chính 58 cặp trong `side_by_side.jsonl` bằng [script chấm đầu ra đã lưu](../scripts/judge_saved_outputs.py), không sinh lại câu trả lời hoặc huấn luyện lại. Hash đầu ra khớp giữa RM, API và summary. Bằng chứng lưu ở [judge_results_api.json](../data/eval/judge_results_api.json) và [judge_summary_api.json](../data/eval/judge_summary_api.json); summary chính giữ nguyên các chỉ số RM và bổ sung các trường chấm chéo.
+
+Mỗi cặp được chấm theo hai thứ tự: A=SFT/B=DPO và A=DPO/B=SFT. Chỉ ghi thắng khi hai lượt cùng chọn một mô hình; nếu lựa chọn khác nhau thì tính hoà. Prompt và quy tắc này dùng lại từ NB4; API dùng JSON mode, giới hạn 200 completion token mỗi lượt và temperature mặc định của provider. Seed 42 chỉ cố định phần bootstrap thống kê, không đặt seed cho quá trình sinh phán quyết API. Vì vậy, kết quả chấm có thể biến động nếu gọi lại. API không qua bộ sanity RM, nên `sanity_accuracy=null`, không diễn giải thành 0% hoặc 100%.
+
+| Nhóm API | n | DPO thắng | SFT thắng | Hoà | Win rate [CI 95%] | Position consistency | Win rate cặp dài gần bằng nhau (n) | Câu dài hơn thắng |
+|---|---:|---:|---:|---:|---|---:|---|---|
+| Held-out | 50 | 1 | 2 | 47 | 49,00% [46,00%; 52,00%] | 88,00% | 47,78% (45) | 33,33% (1/3) |
+| Hữu ích — helpfulness | 4 | 1 | 0 | 3 | 62,50% [50,00%; 87,50%] | 75,00% | 50,00% (3) | 100% (1/1) |
+| An toàn — safety | 4 | 0 | 0 | 4 | 50,00% [50,00%; 50,00%] | 100% | 50,00% (4) | Không xác định: không có cặp thắng/thua |
+| Toàn bộ | 58 | 2 | 2 | 54 | 50,00% [46,55%; 53,45%] | 87,93% | 48,08% (52) | 50,00% (2/4) |
+
+Cả bốn nhóm đều có `n_failed=0`. Theo API, held-out thắng trực tiếp chỉ là 1/50 = 2%; 49% vẫn là win rate có tính nửa điểm cho hoà. So với RM 46% [38%; 53%], API 49% [46%; 52%] cũng chưa cho thấy DPO vượt SFT. Hai kết quả không được gộp thành một tập 100 câu hỏi độc lập vì chấm cùng 50 câu. CI safety co lại thành [50%; 50%] do bootstrap chỉ rút lại bốn điểm đều bằng 0,5; điều đó không chứng minh chất lượng an toàn được biết chính xác hoặc hai mô hình tương đương trên các tình huống khác.
+
+**Cần phân biệt hai nguyên nhân hoà của API.** Trên toàn bộ tập, 54 lượt hoà gồm 47 cặp được cả hai thứ tự cùng chấm `tie`, và 7 cặp bị quy về hoà vì không nhất quán khi đảo A/B. Riêng held-out, 47 lượt hoà gồm 41 cặp cùng chấm `tie` và 6 cặp không nhất quán. Do đó, hoà cuối không luôn có nghĩa giám khảo đánh giá hai câu tương đương. Khoảng bootstrap hẹp còn phản ánh việc nhiều điểm đã được quy về 0,5 theo quy tắc tổng hợp, không phải chứng nhận API chính xác hơn RM.
+
+Position consistency toàn bộ là 51/58 = 87,93%, held-out là 44/50 = 88%; đây là độ ổn định của lựa chọn giữa hai thứ tự, không phải accuracy. Riêng 16 cặp held-out khác đầu ra, chỉ 11/16 = 68,75% nhất quán. Một trường hợp đáng chú ý là e24: hai câu trả lời giống hệt nhau nhưng API chọn A trong cả hai lượt. Vì A đại diện cho hai mô hình khác nhau sau khi đảo, quy tắc tính cặp này là hoà và đánh dấu không nhất quán. Trường hợp này cho thấy cần kiểm tra ảnh hưởng vị trí và/hoặc biến động giữa các lần gọi; chưa đủ để xác định riêng nguyên nhân là thiên vị vị trí.
+
+Mức đồng thuận API–Llama RM tính trên các ID được cả hai chấm hợp lệ:
+
+| Phạm vi | Đồng thuận API–RM |
+|---|---:|
+| Toàn bộ 58 cặp | 42/58 = 72,41% |
+| 50 câu held-out | 36/50 = 72,00% |
+| 19 cặp khác đầu ra, toàn bộ | 3/19 = 15,79% |
+| 16 cặp khác đầu ra, held-out | 2/16 = 12,50% |
+
+Đồng thuận chung vẫn được kéo lên bởi 39 cặp giống hệt, đều có kết quả cuối là hoà ở cả RM và API. Trong 16 cặp held-out khác đầu ra, hai bên cùng chọn SFT ở e0/e21, chọn ngược nhau ở e33, còn 13 cặp API cho hoà trong khi RM chọn một bên. Như vậy, phần lớn bất đồng ở nhóm này là **API chưa giữ một lựa chọn thắng qua hai thứ tự**, không phải API thường xuyên chọn mô hình ngược RM. Trong 13 lượt hoà đó, tám cặp được cả hai thứ tự cùng chấm `tie`, năm cặp không nhất quán. Các tỉ lệ có điều kiện này chỉ mô tả nhóm khác đầu ra, không thay thế mức đồng thuận của toàn bộ tập; agreement cũng không phải accuracy.
+
+Hai ví dụ giúp đối chiếu lại nhận xét nội dung: h4 được cả RM và API chọn DPO thắng, nhưng câu trả lời vẫn có sự thiếu nhất quán và lặp ý đã nêu ở §4.6; hai giám khảo cùng chọn chưa bảo đảm nội dung đúng. Ở s3, RM chọn DPO thắng còn API chấm hoà ở cả hai thứ tự, nên cải thiện nhỏ về cách chuyển tiếp hỗ trợ phụ thuộc tiêu chí của giám khảo và chưa được xác nhận đồng nhất.
+
+Chấm chéo đã bổ sung một nguồn đánh giá khác Skywork, nhưng chưa xác định được giám khảo nào đúng hoặc chứng minh preference leakage là nguyên nhân bất đồng. Tôi giữ nguyên kết quả RM và API, không chọn bên cho win rate đẹp hơn. Từ cả hai nguồn, chưa có bằng chứng đủ mạnh rằng DPO cải thiện chất lượng sinh câu trả lời ở cấu hình này. Lần đánh giá tiếp theo cần ưu tiên xác minh lỗi định dạng và bổ sung nhãn người theo tiêu chí đúng/nhất quán/tuân thủ yêu cầu, đồng thời giữ tập câu hỏi đã định trước.
 
 ## 5. Đánh đổi theo β — chưa chạy bonus sweep
 
@@ -227,7 +260,7 @@ Giả thuyết cho thí nghiệm tiếp theo: β lớn hơn thường tăng ràn
 
 ## 6. Một quyết định quan trọng nhất: hoàn thành cấu hình cơ sở trước khi mở rộng
 
-Tôi chọn hoàn thành NB0–NB4 với cấu hình T4 mặc định: 1.000 mẫu SFT, 800 cặp DPO, β = 0,1 và learning rate `5e-6`, trước khi thử SFT 100 mẫu hoặc quét β. Phương án thay thế là giảm SFT để thử độ nhạy của điểm xuất phát, huấn luyện ba mức β, hoặc chạy API judge. Tôi chưa thực hiện các phương án đó và không coi cấu hình mặc định là tối ưu chỉ vì nó nằm trong notebook.
+Tôi chọn hoàn thành NB0–NB4 với cấu hình T4 mặc định: 1.000 mẫu SFT, 800 cặp DPO, β = 0,1 và learning rate `5e-6`, trước khi thử SFT 100 mẫu hoặc quét β. Phương án thay thế khi đó là giảm SFT để thử độ nhạy của điểm xuất phát, huấn luyện ba mức β, hoặc chấm API ngay từ đầu. Tôi giữ lượt cơ sở trước, không coi cấu hình mặc định là tối ưu chỉ vì nó nằm trong notebook. Sau khi hoàn thành phần lõi, tôi mới bổ sung chấm chéo GPT-4o mini ở §4.8; chưa thử giảm SFT hoặc quét β.
 
 Lý do giữ một lượt cơ sở là cần chuỗi bằng chứng hoàn chỉnh từ reference SFT, dữ liệu không trùng câu hỏi, biểu đồ train/held-out đến đánh giá đầu ra. Thay dữ liệu hoặc huấn luyện lại giữa chừng sẽ thay reference và có thể ghi đè kết quả; khi đó khó quy chênh lệch cho một yếu tố. Tôi cũng giữ nguyên dữ liệu dù năm mẫu cho thấy nhãn có vấn đề, để tránh thêm một thao tác lọc chưa được đánh giá vào lần cơ sở.
 
@@ -254,13 +287,13 @@ Không chạy NB7; không có đường reward hoặc độ chính xác trước
 - [ ] NB6 — benchmark (+6)
 - [ ] NB7 — GRPO (+8)
 - [ ] β-sweep (+6)
-- [ ] Chấm chéo bằng RM và API judge khác họ (+4)
+- [x] Chấm chéo bằng RM và API judge khác họ (+4) — GPT-4o mini, 58 cặp, `cross_judge.agreement=0.724138`; xem §4.8
 - [ ] Đẩy adapter lên HF Hub và viết model card (+3)
 - [ ] `BONUS-CHALLENGE.md` — thử thách không chấm điểm
 
 ## Giới hạn tái lập và kiểm tra nộp bài
 
-Notebook lưu output NB0–NB4; bonus được bỏ qua. Bằng chứng gồm bốn ảnh, cấu hình SFT/DPO, metrics, split, hai Parquet và ba file đánh giá NB4. Trọng số không được commit theo hướng dẫn. Hash dữ liệu và đầu ra đã được đối chiếu; summary trong notebook khớp file tải về.
+Notebook lưu output phần lõi NB0–NB4; các phần bonus GPU được bỏ qua. Bonus chấm chéo API được chạy bổ sung trên local từ chính đầu ra đã lưu, với mã và kết quả riêng. Bằng chứng gồm bốn ảnh, cấu hình SFT/DPO, metrics, split, hai Parquet, ba file đánh giá RM/NB4 và hai file kết quả API. Trọng số không được commit theo hướng dẫn. Hash dữ liệu và đầu ra đã được đối chiếu; các chỉ số RM gốc khớp notebook, các nhóm thống kê RM/API đã được tính lại từ phán quyết từng cặp. Các trường chấm chéo bổ sung trong summary không nằm trong output notebook Colab cũ.
 
 Chưa xác nhận một lượt chạy lại toàn bộ phần bắt buộc từ môi trường sạch. Chạy “tất cả” nguyên notebook còn đi qua bonus, nên việc chạy từng phần và bỏ qua bonus chưa chứng minh luồng đó đã được kiểm tra.
 

@@ -1,0 +1,108 @@
+{
+  "judge": "openai:gpt-4o-mini",
+  "outputs_sha256": "10b0d75194b1f36b464f8a6feb4949dbc75c6836427eeca0ad666ab264d3c5ce",
+  "sanity_accuracy": null,
+  "sanity": null,
+  "overall": {
+    "n": 58,
+    "n_failed": 0,
+    "dpo_wins": 2,
+    "sft_wins": 2,
+    "ties": 54,
+    "dpo_win_rate": 0.5,
+    "win_rate_ci95": [
+      0.46551724137931033,
+      0.5344827586206896
+    ],
+    "position_consistency": 0.8793103448275862,
+    "longer_answer_won_frac": 0.5,
+    "length_matched_n": 52,
+    "length_matched_win_rate": 0.4807692307692308,
+    "mean_chars_sft": 577.5689655172414,
+    "mean_chars_dpo": 582.2586206896551
+  },
+  "heldout": {
+    "n": 50,
+    "n_failed": 0,
+    "dpo_wins": 1,
+    "sft_wins": 2,
+    "ties": 47,
+    "dpo_win_rate": 0.49,
+    "win_rate_ci95": [
+      0.46,
+      0.52
+    ],
+    "position_consistency": 0.88,
+    "longer_answer_won_frac": 0.3333333333333333,
+    "length_matched_n": 45,
+    "length_matched_win_rate": 0.4777777777777778,
+    "mean_chars_sft": 573.0,
+    "mean_chars_dpo": 572.74
+  },
+  "helpfulness": {
+    "n": 4,
+    "n_failed": 0,
+    "dpo_wins": 1,
+    "sft_wins": 0,
+    "ties": 3,
+    "dpo_win_rate": 0.625,
+    "win_rate_ci95": [
+      0.5,
+      0.875
+    ],
+    "position_consistency": 0.75,
+    "longer_answer_won_frac": 1.0,
+    "length_matched_n": 3,
+    "length_matched_win_rate": 0.5,
+    "mean_chars_sft": 757.0,
+    "mean_chars_dpo": 835.25
+  },
+  "safety": {
+    "n": 4,
+    "n_failed": 0,
+    "dpo_wins": 0,
+    "sft_wins": 0,
+    "ties": 4,
+    "dpo_win_rate": 0.5,
+    "win_rate_ci95": [
+      0.5,
+      0.5
+    ],
+    "position_consistency": 1.0,
+    "longer_answer_won_frac": null,
+    "length_matched_n": 4,
+    "length_matched_win_rate": 0.5,
+    "mean_chars_sft": 455.25,
+    "mean_chars_dpo": 448.25
+  },
+  "cross_judge": {
+    "other_judge": "rm-panel:Skywork/Skywork-Reward-V2-Llama-3.2-3B",
+    "n": 58,
+    "agreement": 0.7241379310344828
+  },
+  "cross_judge_heldout": {
+    "other_judge": "rm-panel:Skywork/Skywork-Reward-V2-Llama-3.2-3B",
+    "n": 50,
+    "agreement": 0.72
+  },
+  "cross_judge_changed": {
+    "other_judge": "rm-panel:Skywork/Skywork-Reward-V2-Llama-3.2-3B",
+    "n": 19,
+    "agreement": 0.15789473684210525
+  },
+  "cross_judge_heldout_changed": {
+    "other_judge": "rm-panel:Skywork/Skywork-Reward-V2-Llama-3.2-3B",
+    "n": 16,
+    "agreement": 0.125
+  },
+  "run": {
+    "judge": "openai:gpt-4o-mini",
+    "outputs_sha256": "10b0d75194b1f36b464f8a6feb4949dbc75c6836427eeca0ad666ab264d3c5ce",
+    "seed": 42,
+    "max_completion_tokens": 200,
+    "judge_prompt_sha256": "b376eed04b41aaf8f7df42f5f53ac7b189af49a0f436472b364491eb07bf9e09",
+    "orders_per_pair": 2,
+    "invalid_verdict_retries_per_order": 1,
+    "temperature": "provider default (same caller as NB4)"
+  }
+}

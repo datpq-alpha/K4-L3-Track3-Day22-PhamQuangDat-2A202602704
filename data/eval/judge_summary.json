@@ -125,5 +125,26 @@
     ],
     "n": 58,
     "agreement": 0.8103448275862069
-  }
+  },
+  "cross_judge": {
+    "other_judge": "openai:gpt-4o-mini",
+    "n": 58,
+    "agreement": 0.7241379310344828
+  },
+  "cross_judge_heldout": {
+    "other_judge": "openai:gpt-4o-mini",
+    "n": 50,
+    "agreement": 0.72
+  },
+  "cross_judge_changed": {
+    "other_judge": "openai:gpt-4o-mini",
+    "n": 19,
+    "agreement": 0.15789473684210525
+  },
+  "cross_judge_heldout_changed": {
+    "other_judge": "openai:gpt-4o-mini",
+    "n": 16,
+    "agreement": 0.125
+  },
+  "api_summary_file": "judge_summary_api.json"
 }

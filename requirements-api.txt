@@ -1,0 +1,2 @@
+# API judging of saved outputs only; no CUDA/training stack required.
+openai>=1.55,<4.0
