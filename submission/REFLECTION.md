@@ -10,7 +10,7 @@
 
 **Ngày thực hành:** 2026-10-08
 
-Báo cáo đối chiếu yêu cầu trong [README.md](../README.md) và [rubric.md](../rubric.md). Số liệu lấy từ [notebook đã chạy](../colab/Lab22_DPO_T4.ipynb), [DPO metrics](../adapters/dpo/dpo_metrics.json), [kết quả tổng hợp](../data/eval/judge_summary.json) và [câu trả lời gốc](../data/eval/side_by_side.jsonl). Những phần chưa thực nghiệm được ghi rõ, không thay giả thuyết bằng kết quả.
+Báo cáo đối chiếu yêu cầu trong [README.md](../README.md) và [rubric.md](../rubric.md). Số liệu phần lõi lấy từ [notebook đã chạy](../colab/Lab22_DPO_T4.ipynb), [DPO metrics](../adapters/dpo/dpo_metrics.json), [kết quả tổng hợp](../data/eval/judge_summary.json) và [câu trả lời gốc](../data/eval/side_by_side.jsonl). Bonus NB5 dùng [notebook của lượt chạy bổ sung](../NB5/Lab22_DPO_T4.ipynb) và [metadata HF–GGUF](../data/eval/deploy_meta.json), được trình bày riêng ở §4.9. Những phần chưa thực nghiệm được ghi rõ, không thay giả thuyết bằng kết quả.
 
 ## 1. Cấu hình và kiểm tra dữ liệu
 
@@ -252,15 +252,52 @@ Hai ví dụ giúp đối chiếu lại nhận xét nội dung: h4 được cả
 
 Chấm chéo đã bổ sung một nguồn đánh giá khác Skywork, nhưng chưa xác định được giám khảo nào đúng hoặc chứng minh preference leakage là nguyên nhân bất đồng. Tôi giữ nguyên kết quả RM và API, không chọn bên cho win rate đẹp hơn. Từ cả hai nguồn, chưa có bằng chứng đủ mạnh rằng DPO cải thiện chất lượng sinh câu trả lời ở cấu hình này. Lần đánh giá tiếp theo cần ưu tiên xác minh lỗi định dạng và bổ sung nhãn người theo tiêu chí đúng/nhất quán/tuân thủ yêu cầu, đồng thời giữ tập câu hỏi đã định trước.
 
+### 4.9. Bonus NB5: xuất SFT+DPO sang GGUF Q4_K_M
+
+Sau khi phiên Colab ban đầu kết thúc, tôi chạy lại SFT và DPO để có trọng số phục vụ NB5. Đây là lượt chạy bổ sung, không phải checkpoint đã sinh 58 cặp ở NB4 và được chấm RM/API tại §4.1–§4.8. Tôi giữ nguyên số liệu và bằng chứng phần lõi; không dùng kết quả NB5 để thay thế đánh giá đầu ra của lượt cơ sở.
+
+**Kiểm tra mô hình trước khi xuất.** Output NB5 ghi `DPO adapter base: /content/lab22/models/sft-merged`, xác nhận đường dẫn reference SFT được khai báo. Khi nạp adapter, phép kiểm tra `n_lora > 0` qua và log báo **504 tensor LoRA**. Tiếp đó, log ghi quá trình gộp trọng số 16-bit và chuyển đổi GGUF thành công. Những bằng chứng này hỗ trợ việc mô hình xuất là SFT+DPO; tên file `sft-merged.Q4_K_M.gguf` được lấy theo thư mục base, nên riêng tên file không đủ để kết luận chỉ xuất SFT.
+
+| Mục | Kết quả lưu từ lượt NB5 |
+|---|---|
+| Mô hình gốc / GPU | `unsloth/Qwen3-4B-Instruct-2507-unsloth-bnb-4bit` / T4 |
+| Môi trường trong log | Unsloth 2026.10.3; Transformers 5.17.0; PyTorch 2.11.0+cu130 |
+| DPO | β = 0,1; learning rate `5e-6`; loss `sigmoid`; 1 epoch |
+| Loss trung bình toàn lượt DPO | 0,6741156960 |
+| Reward gap train / held-out | 0,0940929062 / 0,0835043406 |
+| Reward accuracy held-out | 69% |
+| Định dạng xuất | GGUF `Q4_K_M` |
+| File trong phiên Colab | `gguf_gguf/sft-merged.Q4_K_M.gguf` |
+| Dung lượng theo metadata | 2.497,3 MB, xấp xỉ 2,50 GB |
+
+Các metrics DPO trên được đọc từ JSON đã in trong notebook bổ sung. Accuracy 69% và margin 0,083504 khác lượt cơ sở 62% và 0,077041; đây là kết quả của lần huấn luyện lại. Chưa có đối chứng để quy chênh lệch cho một nguyên nhân cụ thể, và các chỉ số này không đo tác động của lượng tử hoá. File `adapters/dpo/dpo_metrics.json` trong repo vẫn thuộc lượt cơ sở.
+
+![Chạy thử GGUF Q4_K_M bằng llama.cpp trên Colab](screenshots/06-gguf-smoke.png)
+
+**So sánh trên cùng câu hỏi.** Prompt là “Giải thích ngắn gọn (3 câu) cách thuật toán Bubble sort hoạt động.” Notebook sinh câu trả lời HF trước khi xuất, render prompt bằng chat template với `enable_thinking=false`, rồi đưa cùng chuỗi prompt đã render vào llama.cpp. Giới hạn sinh là 160 token; HF dùng greedy, GGUF dùng `temperature=0`. Cấu hình và hai câu trả lời nguyên văn được giữ trong [deploy_meta.json](../data/eval/deploy_meta.json).
+
+| Tiêu chí | HF — SFT+DPO | GGUF — Q4_K_M |
+|---|---|---|
+| Nội dung chính | So sánh các phần tử liên tiếp, đổi chỗ nếu sai thứ tự; lặp đến khi không còn cặp cần đổi chỗ | So sánh các phần tử liên tiếp, hoán đổi nếu sai vị trí; lặp đến khi không còn hoán đổi |
+| Khác biệt diễn đạt | “đổi chỗ”, “không ở đúng thứ tự” | “hoán đổi”, “không ở vị trí đúng” |
+| Tuân thủ yêu cầu 3 câu | Phần giải thích có 2 câu | Phần giải thích có 2 câu |
+| Lỗi định dạng đầu câu | Hai thẻ `</tool_call>` | Một thẻ `</tool_call>` và một thẻ `<tool_call>` |
+
+Ở ví dụ này, hai bản giữ cùng ý chính về Bubble sort và không cho thấy thay đổi lớn về nội dung sau xuất. Tuy nhiên, cả hai đều chưa đáp ứng đủ ba câu và còn lộ thẻ công cụ. Lỗi đã xuất hiện ở câu trả lời HF trước chuyển đổi, nên không thể coi lượng tử hoá là nguyên nhân tạo ra toàn bộ lỗi thẻ. Sự khác nhau giữa thẻ đóng/mở cũng chưa đủ để xác định lỗi mới do GGUF. Hai bản còn khác backend suy luận và cách biểu diễn trọng số; chỉ một prompt không tách được tác động của từng yếu tố.
+
+**Điều học được và giới hạn.** Xuất thành công, nạp được bằng llama.cpp và sinh được câu trả lời xác nhận luồng triển khai đã chạy trong phiên Colab. Điều đó chưa chứng minh Q4_K_M giữ nguyên chất lượng trên nhiều nhiệm vụ, chạy nhanh hơn hoặc dùng ít VRAM hơn ở một mức đo cụ thể: tôi chưa đo tốc độ, peak VRAM hay đánh giá nhiều prompt cho cả hai bản. Lần kiểm tra tiếp theo nên dùng một tập câu hỏi cố định gồm kiến thức, làm theo định dạng và safety, giữ cùng prompt/template/giới hạn sinh, rồi đo chất lượng, tốc độ và bộ nhớ trước khi kết luận về đánh đổi triển khai.
+
+Tôi đã tải được notebook giữ output, metadata và ảnh, nhưng không kịp tải `dpo_metrics.json` và `adapter_config.json` của lượt mới trước khi phiên bị dọn dẹp. Metrics vẫn đọc được từ JSON đã in; cấu hình adapter chỉ còn bằng chứng đường dẫn base trong log, chưa khôi phục được đầy đủ. Tôi không dùng cấu hình cũ để giả định là cấu hình mới. File GGUF và checkpoint của lượt này cũng không có trong bộ file local đã lưu, nên bằng chứng hiện tại cho phép xem lại lần xuất/chạy thử, chưa cho phép nạp lại chính trọng số đó mà không huấn luyện hoặc xuất lại.
+
 ## 5. Đánh đổi theo β — chưa chạy bonus sweep
 
-Lượt chạy duy nhất dùng β = 0,1, đạt margin held-out 0,077041 và reward accuracy 62%. Chưa có kết quả β = 0,05 hoặc 0,5; không nhận điểm bonus cho β-sweep.
+Lượt cơ sở dùng β = 0,1, đạt margin held-out 0,077041 và reward accuracy 62%. Lượt chạy bổ sung phục vụ NB5 cũng dùng β = 0,1; chưa có kết quả β = 0,05 hoặc 0,5, nên không nhận điểm bonus cho β-sweep.
 
 Giả thuyết cho thí nghiệm tiếp theo: β lớn hơn thường tăng ràng buộc với reference trong diễn giải mục tiêu DPO, nhưng mức thay đổi thực tế còn phụ thuộc tối ưu hoá và dữ liệu. Vì reward margin có nhân β, không thể so trực tiếp margin giữa các β để kết luận policy thay đổi nhiều hay ít; cần xem thêm margin/β, accuracy và chất lượng sinh câu trả lời. Tôi dự đoán β nhỏ có thể tạo thay đổi mạnh hơn nhưng nhiều nhiễu hơn, và accuracy held-out không nhất thiết tăng đơn điệu theo β.
 
 ## 6. Một quyết định quan trọng nhất: hoàn thành cấu hình cơ sở trước khi mở rộng
 
-Tôi chọn hoàn thành NB0–NB4 với cấu hình T4 mặc định: 1.000 mẫu SFT, 800 cặp DPO, β = 0,1 và learning rate `5e-6`, trước khi thử SFT 100 mẫu hoặc quét β. Phương án thay thế khi đó là giảm SFT để thử độ nhạy của điểm xuất phát, huấn luyện ba mức β, hoặc chấm API ngay từ đầu. Tôi giữ lượt cơ sở trước, không coi cấu hình mặc định là tối ưu chỉ vì nó nằm trong notebook. Sau khi hoàn thành phần lõi, tôi mới bổ sung chấm chéo GPT-4o mini ở §4.8; chưa thử giảm SFT hoặc quét β.
+Tôi chọn hoàn thành NB0–NB4 với cấu hình T4 mặc định: 1.000 mẫu SFT, 800 cặp DPO, β = 0,1 và learning rate `5e-6`, trước khi thử SFT 100 mẫu hoặc quét β. Phương án thay thế khi đó là giảm SFT để thử độ nhạy của điểm xuất phát, huấn luyện ba mức β, hoặc chấm API ngay từ đầu. Tôi giữ lượt cơ sở trước, không coi cấu hình mặc định là tối ưu chỉ vì nó nằm trong notebook. Sau khi hoàn thành phần lõi, tôi mới bổ sung chấm chéo GPT-4o mini ở §4.8 và chạy lại SFT/DPO để thực hiện NB5 ở §4.9; chưa thử giảm SFT hoặc quét β.
 
 Lý do giữ một lượt cơ sở là cần chuỗi bằng chứng hoàn chỉnh từ reference SFT, dữ liệu không trùng câu hỏi, biểu đồ train/held-out đến đánh giá đầu ra. Thay dữ liệu hoặc huấn luyện lại giữa chừng sẽ thay reference và có thể ghi đè kết quả; khi đó khó quy chênh lệch cho một yếu tố. Tôi cũng giữ nguyên dữ liệu dù năm mẫu cho thấy nhãn có vấn đề, để tránh thêm một thao tác lọc chưa được đánh giá vào lần cơ sở.
 
@@ -283,7 +320,7 @@ Không chạy NB7; không có đường reward hoặc độ chính xác trước
 ## Danh sách bonus
 
 - [ ] NB3b — biến thể loss (+8)
-- [ ] NB5 — GGUF SFT+DPO (+4)
+- [x] NB5 — GGUF SFT+DPO (+4) — xuất Q4_K_M và chạy thử llama.cpp; metadata, ảnh và notebook giữ output; xem §4.9
 - [ ] NB6 — benchmark (+6)
 - [ ] NB7 — GRPO (+8)
 - [ ] β-sweep (+6)
@@ -293,7 +330,7 @@ Không chạy NB7; không có đường reward hoặc độ chính xác trước
 
 ## Giới hạn tái lập và kiểm tra nộp bài
 
-Notebook lưu output phần lõi NB0–NB4; các phần bonus GPU được bỏ qua. Bonus chấm chéo API được chạy bổ sung trên local từ chính đầu ra đã lưu, với mã và kết quả riêng. Bằng chứng gồm bốn ảnh, cấu hình SFT/DPO, metrics, split, hai Parquet, ba file đánh giá RM/NB4 và hai file kết quả API. Trọng số không được commit theo hướng dẫn. Hash dữ liệu và đầu ra đã được đối chiếu; các chỉ số RM gốc khớp notebook, các nhóm thống kê RM/API đã được tính lại từ phán quyết từng cặp. Các trường chấm chéo bổ sung trong summary không nằm trong output notebook Colab cũ.
+Notebook phần lõi lưu output NB0–NB4 và bỏ qua các bonus GPU trong lượt đó. Bonus chấm chéo API được chạy bổ sung trên local từ chính đầu ra đã lưu, với mã và kết quả riêng. NB5 được thực hiện trong phiên Colab bổ sung; notebook lưu riêng tại `NB5/Lab22_DPO_T4.ipynb`, metadata tại `data/eval/deploy_meta.json`, ảnh tại `submission/screenshots/06-gguf-smoke.png`. Bộ bằng chứng hiện có năm ảnh, cấu hình SFT/DPO của lượt cơ sở, metrics, split, hai Parquet, ba file đánh giá RM/NB4, hai file kết quả API và metadata NB5. Trọng số không được commit theo hướng dẫn; checkpoint và file GGUF của lượt NB5 chưa được tải về local. Hash dữ liệu và đầu ra phần lõi đã được đối chiếu; các chỉ số RM gốc khớp notebook, các nhóm thống kê RM/API đã được tính lại từ phán quyết từng cặp. Các trường chấm chéo bổ sung trong summary không nằm trong output notebook Colab cũ; metrics huấn luyện lại ở notebook NB5 không thay thế metrics lượt cơ sở.
 
 Chưa xác nhận một lượt chạy lại toàn bộ phần bắt buộc từ môi trường sạch. Chạy “tất cả” nguyên notebook còn đi qua bonus, nên việc chạy từng phần và bỏ qua bonus chưa chứng minh luồng đó đã được kiểm tra.
 
